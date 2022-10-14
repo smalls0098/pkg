@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type Config struct {
+type ZapConfig struct {
 	Prod       bool
 	Filename   string
 	MaxSize    int32
@@ -17,7 +17,7 @@ type Config struct {
 	Compress   bool
 }
 
-func NewZapLogger(config Config) *zap.Logger {
+func NewZapLogger(config ZapConfig) *zap.Logger {
 	encoder := zapcore.EncoderConfig{
 		TimeKey:        "t",
 		LevelKey:       "level",
