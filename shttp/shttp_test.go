@@ -1,6 +1,7 @@
 package shttp_test
 
 import (
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -13,9 +14,14 @@ func Test_Client_Get(t *testing.T) {
 		c.ProxyUrl(p)
 		return nil
 	}))
-	resp, err := client.Get("http://baidu.com", func(c *shttp.Client, req *shttp.Request) {
+	resp, err := client.Post("http://baidu.com", func(c *shttp.Client, req *shttp.Request) {
 		req.Header("test", "1")
 		req.Query("test", "1")
+		req.AddCookie(&http.Cookie{Name: "111", Value: "1111"})
+
+		req.AddPostForm("11", "22")
+
+		t.Log(req.RequestInfo())
 	})
 	if err != nil {
 		t.Fatal(err)

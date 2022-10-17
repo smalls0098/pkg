@@ -3,9 +3,11 @@ package shttp
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const (
@@ -263,6 +265,40 @@ func (r *Request) Body(content []byte) {
 	if r.body == nil {
 		r.body = content
 	}
+}
+
+func (r *Request) RequestInfo() string {
+	cookieStr := strings.Builder{}
+	cookieStr.WriteString("CookieInfo:\n")
+	for i, cookie := range r.req.Cookies() {
+		if i != 0 {
+			cookieStr.WriteString("; ")
+		}
+		cookieStr.WriteString(cookie.String())
+	}
+
+	headerStr := strings.Builder{}
+	headerStr.WriteString("headerInfo:\n")
+	for k, v := range r.headers {
+		headerStr.WriteString(fmt.Sprintf("%s: %s\n", k, strings.Join(v, " ")))
+	}
+
+	bodyStr := strings.Builder{}
+	bodyStr.WriteString("BodyInfo:\n")
+	if len(r.body) > 0 {
+		bodyStr.Write(r.body)
+	}
+	for k, v := range r.postForm {
+		bodyStr.WriteString(fmt.Sprintf("%s: %s\n", k, strings.Join(v, " ")))
+	}
+
+	queriesStr := strings.Builder{}
+	queriesStr.WriteString("queriesInfo:\n")
+	for k, v := range r.queries {
+		queriesStr.WriteString(fmt.Sprintf("%s: %s\n", k, strings.Join(v, " ")))
+	}
+
+	return fmt.Sprintf("\nURL:%s\n\n%s\n%s\n%s\n\n%s", r.req.URL.String(), queriesStr.String(), headerStr.String(), cookieStr.String(), bodyStr.String())
 }
 
 func jsonMarshal(obj interface{}) ([]byte, error) {
