@@ -198,6 +198,9 @@ func (c *Client) Do(req *Request) (*Response, error) {
 		return nil, err
 	}
 	resp := NewResponse(httpResp)
+	if resp == nil {
+		return nil, errors.New("response is nil")
+	}
 	if len(c.middlewares) > 0 {
 		for _, m := range c.middlewares {
 			err = m(c, req, resp)
@@ -205,9 +208,6 @@ func (c *Client) Do(req *Request) (*Response, error) {
 				return nil, err
 			}
 		}
-	}
-	if resp == nil {
-		return nil, errors.New("response is nil")
 	}
 	return resp, nil
 }
