@@ -8,6 +8,22 @@ import (
 )
 
 func Test_Client_Get(t *testing.T) {
+	client := shttp.New(shttp.WithMiddleware(func(c *shttp.Client, req *shttp.Request, resp *shttp.Response) error {
+		p, _ := url.Parse("http://127.0.0.1:9900")
+		c.ProxyUrl(p)
+		return nil
+	}))
+	resp, err := client.Get("http://baidu.com", func(c *shttp.Client, req *shttp.Request) {
+		req.Header("test", "1")
+		req.Query("test", "1")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(resp)
+}
+
+func Test_DefaultClient_Get(t *testing.T) {
 	response, err := shttp.Get("http://baidu.com", func(c *shttp.Client, req *shttp.Request) {
 		req.Header("test", "1")
 		req.Query("test", "1")
@@ -21,7 +37,7 @@ func Test_Client_Get(t *testing.T) {
 	t.Log(response)
 }
 
-func Test_Client_Post(t *testing.T) {
+func Test_DefaultClient_Post(t *testing.T) {
 	response, err := shttp.Post("http://baidu.com", func(c *shttp.Client, req *shttp.Request) {
 		req.Header("test", "1")
 		req.Query("test", "1")

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,8 +13,10 @@ import (
 )
 
 type (
-	Handler func(c *Client, req *Request)
-	G       map[string]interface{}
+	Middleware     func(c *Client, req *Request, resp *Response) error
+	RequestHandler func(c *Client, req *Request)
+	G              map[string]interface{}
+	Option         func(*Client)
 )
 
 // VERSION sHttp version
@@ -29,86 +32,42 @@ var (
 type Client struct {
 	c *http.Client
 
-	handlers []Handler
+	middlewares []Middleware
 }
 
-// DefaultClient is the default Client and is used by Get, Head, and Post.
 var DefaultClient = &Client{
-	c: http.DefaultClient,
+	c:           http.DefaultClient,
+	middlewares: make([]Middleware, 0),
 }
 
-func New(handlers ...Handler) *Client {
-	return &Client{
+func New(opts ...Option) *Client {
+	options := &Client{
 		c: &http.Client{
 			Transport:     defaultTransport(),
 			CheckRedirect: defaultCheckRedirect(),
 			Jar:           nil,
 			Timeout:       connectTimeout,
 		},
-		handlers: handlers,
+		middlewares: make([]Middleware, 0),
+	}
+	for _, o := range opts {
+		o(options)
+	}
+	return options
+}
+
+func WithMiddleware(middleware Middleware) Option {
+	return func(opts *Client) {
+		opts.Use(middleware)
 	}
 }
 
-func Get(url string, handlers ...Handler) (*Response, error) {
-	return DefaultClient.Get(url, handlers...)
-}
-
-func Post(url string, handlers ...Handler) (*Response, error) {
-	return DefaultClient.Post(url, handlers...)
-}
-
-func (c *Client) Get(url string, handlers ...Handler) (*Response, error) {
-	if c == nil {
-		return nil, errors.New("client is nil")
+func (c *Client) Use(middleware Middleware) *Client {
+	if c.middlewares == nil {
+		c.middlewares = make([]Middleware, 0)
 	}
-	httpReq, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(c.handlerRequest(httpReq, handlers...))
-}
-
-func (c *Client) Get4Bytes(url string, handlers ...Handler) ([]byte, error) {
-	resp, err := c.Get(url, handlers...)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Bytes()
-}
-
-func (c *Client) Get4String(url string, handlers ...Handler) (string, error) {
-	resp, err := c.Get(url, handlers...)
-	if err != nil {
-		return "", err
-	}
-	return resp.String()
-}
-
-func (c *Client) Post(url string, handlers ...Handler) (*Response, error) {
-	if c == nil {
-		return nil, errors.New("client is nil")
-	}
-	httpReq, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(c.handlerRequest(httpReq, handlers...))
-}
-
-func (c *Client) Post4Bytes(url string, handlers ...Handler) ([]byte, error) {
-	resp, err := c.Post(url, handlers...)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Bytes()
-}
-
-func (c *Client) Post4String(url string, handlers ...Handler) (string, error) {
-	resp, err := c.Post(url, handlers...)
-	if err != nil {
-		return "", err
-	}
-	return resp.String()
+	c.middlewares = append(c.middlewares, middleware)
+	return c
 }
 
 func (c *Client) ProxyUrl(proxy *url.URL) {
@@ -156,23 +115,59 @@ func (c *Client) Timeout(connectTimeout time.Duration, readWriteTimeout time.Dur
 	}
 }
 
-func (c *Client) Handler(handler Handler) {
-	if c.handlers == nil {
-		c.handlers = make([]Handler, 0)
+func (c *Client) Request(url string, method Method, body io.Reader, handlers ...RequestHandler) (*Response, error) {
+	if c == nil {
+		return nil, errors.New("client is nil")
 	}
-	c.handlers = append(c.handlers, handler)
+	httpReq, err := http.NewRequest(method.String(), url, body)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(c.handlerRequest(httpReq, handlers...))
 }
 
-func (c *Client) handlerRequest(httpReq *http.Request, handlers ...Handler) *Request {
-	req := NewRequest(httpReq)
-	if c.handlers != nil && len(c.handlers) > 0 {
-		for _, handler := range c.handlers {
-			handler(c, req)
-			if c == nil || req == nil {
-				panic("client or request is nil")
-			}
-		}
+func (c *Client) Get(url string, handlers ...RequestHandler) (*Response, error) {
+	return c.Request(url, GET, nil, handlers...)
+}
+
+func (c *Client) Get4Bytes(url string, handlers ...RequestHandler) ([]byte, error) {
+	resp, err := c.Get(url, handlers...)
+	if err != nil {
+		return nil, err
 	}
+	return resp.Bytes()
+}
+
+func (c *Client) Get4String(url string, handlers ...RequestHandler) (string, error) {
+	resp, err := c.Get(url, handlers...)
+	if err != nil {
+		return "", err
+	}
+	return resp.String()
+}
+
+func (c *Client) Post(url string, handlers ...RequestHandler) (*Response, error) {
+	return c.Request(url, POST, nil, handlers...)
+}
+
+func (c *Client) Post4Bytes(url string, handlers ...RequestHandler) ([]byte, error) {
+	resp, err := c.Post(url, handlers...)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Bytes()
+}
+
+func (c *Client) Post4String(url string, handlers ...RequestHandler) (string, error) {
+	resp, err := c.Post(url, handlers...)
+	if err != nil {
+		return "", err
+	}
+	return resp.String()
+}
+
+func (c *Client) handlerRequest(httpReq *http.Request, handlers ...RequestHandler) *Request {
+	req := NewRequest(httpReq)
 	if handlers != nil && len(handlers) > 0 {
 		for _, handler := range handlers {
 			handler(c, req)
@@ -185,6 +180,15 @@ func (c *Client) handlerRequest(httpReq *http.Request, handlers ...Handler) *Req
 }
 
 func (c *Client) Do(req *Request) (*Response, error) {
+	var err error
+	if len(c.middlewares) > 0 {
+		for _, m := range c.middlewares {
+			err = m(c, req, nil)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	httpReq, err := req.buildRequest()
 	if err != nil {
 		return nil, err
@@ -194,6 +198,14 @@ func (c *Client) Do(req *Request) (*Response, error) {
 		return nil, err
 	}
 	resp := NewResponse(httpResp)
+	if len(c.middlewares) > 0 {
+		for _, m := range c.middlewares {
+			err = m(c, req, resp)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	if resp == nil {
 		return nil, errors.New("response is nil")
 	}
@@ -226,4 +238,12 @@ func defaultCheckRedirect() func(req *http.Request, via []*http.Request) error {
 		}
 		return nil
 	}
+}
+
+func Get(url string, handlers ...RequestHandler) (*Response, error) {
+	return DefaultClient.Get(url, handlers...)
+}
+
+func Post(url string, handlers ...RequestHandler) (*Response, error) {
+	return DefaultClient.Post(url, handlers...)
 }
