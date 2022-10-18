@@ -130,7 +130,7 @@ func (c *Client) Get(url string, handlers ...RequestHandler) (*Response, error) 
 	return c.Request(url, GET, nil, handlers...)
 }
 
-func (c *Client) Get4Bytes(url string, handlers ...RequestHandler) ([]byte, error) {
+func (c *Client) GetToBytes(url string, handlers ...RequestHandler) ([]byte, error) {
 	resp, err := c.Get(url, handlers...)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (c *Client) Get4Bytes(url string, handlers ...RequestHandler) ([]byte, erro
 	return resp.Bytes()
 }
 
-func (c *Client) Get4String(url string, handlers ...RequestHandler) (string, error) {
+func (c *Client) GetToString(url string, handlers ...RequestHandler) (string, error) {
 	resp, err := c.Get(url, handlers...)
 	if err != nil {
 		return "", err
@@ -150,7 +150,7 @@ func (c *Client) Post(url string, handlers ...RequestHandler) (*Response, error)
 	return c.Request(url, POST, nil, handlers...)
 }
 
-func (c *Client) Post4Bytes(url string, handlers ...RequestHandler) ([]byte, error) {
+func (c *Client) PostToBytes(url string, handlers ...RequestHandler) ([]byte, error) {
 	resp, err := c.Post(url, handlers...)
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func (c *Client) Post4Bytes(url string, handlers ...RequestHandler) ([]byte, err
 	return resp.Bytes()
 }
 
-func (c *Client) Post4String(url string, handlers ...RequestHandler) (string, error) {
+func (c *Client) PostToString(url string, handlers ...RequestHandler) (string, error) {
 	resp, err := c.Post(url, handlers...)
 	if err != nil {
 		return "", err
