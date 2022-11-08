@@ -254,6 +254,10 @@ func (r *Request) GetBody() []byte {
 	return r.body
 }
 
+func (r *Request) GetHeaders() url.Values {
+	return r.headers
+}
+
 func (r *Request) BodyJSON4Str(json string) {
 	r.BodyJSON4Bytes([]byte(json))
 }
