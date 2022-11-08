@@ -250,6 +250,10 @@ func (r *Request) BodyJSON(obj interface{}) error {
 	return nil
 }
 
+func (r *Request) GetBody() []byte {
+	return r.body
+}
+
 func (r *Request) BodyJSON4Str(json string) {
 	r.BodyJSON4Bytes([]byte(json))
 }
